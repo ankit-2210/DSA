@@ -10,8 +10,8 @@
  */
 class Solution{
 public:
-    void solve(ListNode *&root){
-        ListNode *head=root;
+    void solve(ListNode *&head){
+        
         ListNode *prev=NULL, *tail=head;
         while(tail != NULL && tail->next != NULL){
             prev=tail;
@@ -26,19 +26,18 @@ public:
         if(head == NULL)
             return NULL;
         int size=1;
-        ListNode *tail=head;
-        while(tail->next != NULL){
+        ListNode *temp=head;
+        while(temp->next != NULL){
             size++;
-            tail=tail->next;
+            temp=temp->next;
         }
-        tail->next=head;
         k%=size;
-        for(int i=0; i<size-k; i++){
-            tail=tail->next;
+        while(k--){
+            solve(head);
         }
-        head=tail->next;
-        tail->next=NULL;
+
         return head;
+       
     }
 };
 
