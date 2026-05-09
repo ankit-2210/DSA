@@ -5,10 +5,10 @@ public:
         int m=mat[0].size();
 
         int layers=min(n, m)/2;
-        for(int i=0; i<layers; i++){
+        for(int l=0; l<layers; l++){
             vector<int> vals;
-            int top=i, bottom=n-i-1;
-            int left=i, right=m-i-1;
+            int top=l, bottom=n-l-1;
+            int left=l, right=m-l-1;
             for(int i=left; i<right; i++){
                 vals.push_back(mat[top][i]);
             }
