@@ -1,0 +1,46 @@
+name: Organize LeetCode
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  organize:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Organize Problems
+        run: |
+          mkdir -p Easy Medium Hard
+
+          for dir in */ ; do
+            if [[ "$dir" =~ ^[0-9]+ ]]; then
+
+              if grep -qi "easy" "$dir/README.md" 2>/dev/null; then
+                mv "$dir" Easy/
+              elif grep -qi "medium" "$dir/README.md" 2>/dev/null; then
+                mv "$dir" Medium/
+              elif grep -qi "hard" "$dir/README.md" 2>/dev/null; then
+                mv "$dir" Hard/
+              fi
+
+            fi
+          done
+
+      - name: Commit Changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+
+          git add .
+
+          git commit -m "Auto organize LeetCode problems" || echo "No changes"
+
+          git push
