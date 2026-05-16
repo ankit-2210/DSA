@@ -22,30 +22,33 @@ jobs:
 
           for dir in */ ; do
 
+            # Remove trailing slash
+            folder="${dir%/}"
+
             # Check only numbered LeetCode folders
-            if [[ "$dir" =~ ^[0-9]+ ]]; then
+            if [[ "$folder" =~ ^[0-9]+ ]]; then
 
               target=""
 
               # Detect difficulty from README.md
-              if grep -qi "easy" "$dir/README.md" 2>/dev/null; then
+              if grep -qi "easy" "$folder/README.md" 2>/dev/null; then
                 target="Easy"
-              elif grep -qi "medium" "$dir/README.md" 2>/dev/null; then
+              elif grep -qi "medium" "$folder/README.md" 2>/dev/null; then
                 target="Medium"
-              elif grep -qi "hard" "$dir/README.md" 2>/dev/null; then
+              elif grep -qi "hard" "$folder/README.md" 2>/dev/null; then
                 target="Hard"
               fi
 
-              # Move + merge files safely
               if [ -n "$target" ]; then
 
-                mkdir -p "$target/$dir"
+                # Create target folder
+                mkdir -p "$target/$folder"
 
-                # Merge contents instead of failing
-                rsync -a "$dir" "$target/"
+                # Copy files INSIDE the folder
+                rsync -a "$folder"/ "$target/$folder"/
 
-                # Remove old folder after merge
-                rm -rf "$dir"
+                # Delete original folder
+                rm -rf "$folder"
               fi
             fi
           done
