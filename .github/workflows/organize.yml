@@ -21,16 +21,32 @@ jobs:
           mkdir -p Easy Medium Hard
 
           for dir in */ ; do
+
+            # Check only numbered LeetCode folders
             if [[ "$dir" =~ ^[0-9]+ ]]; then
 
+              target=""
+
+              # Detect difficulty from README.md
               if grep -qi "easy" "$dir/README.md" 2>/dev/null; then
-                mv "$dir" Easy/
+                target="Easy"
               elif grep -qi "medium" "$dir/README.md" 2>/dev/null; then
-                mv "$dir" Medium/
+                target="Medium"
               elif grep -qi "hard" "$dir/README.md" 2>/dev/null; then
-                mv "$dir" Hard/
+                target="Hard"
               fi
 
+              # Move + merge files safely
+              if [ -n "$target" ]; then
+
+                mkdir -p "$target/$dir"
+
+                # Merge contents instead of failing
+                rsync -a "$dir" "$target/"
+
+                # Remove old folder after merge
+                rm -rf "$dir"
+              fi
             fi
           done
 
