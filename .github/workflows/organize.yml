@@ -14,18 +14,28 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Organize Problems
         run: |
           mkdir -p Easy Medium Hard
 
-          for dir in */ ; do
+          find . -maxdepth 1 -type d | while read dir; do
 
-            # Remove trailing slash
-            folder="${dir%/}"
+            folder=$(basename "$dir")
 
-            # Check only numbered LeetCode folders
+            # Skip unwanted folders
+            if [[ "$folder" == "." || \
+                  "$folder" == ".git" || \
+                  "$folder" == "Easy" || \
+                  "$folder" == "Medium" || \
+                  "$folder" == "Hard" ]]; then
+              continue
+            fi
+
+            # Process only numbered LeetCode folders
             if [[ "$folder" =~ ^[0-9]+ ]]; then
 
               target=""
@@ -41,25 +51,31 @@ jobs:
 
               if [ -n "$target" ]; then
 
-                # Create target folder
+                echo "Moving $folder -> $target"
+
                 mkdir -p "$target/$folder"
 
-                # Copy files INSIDE the folder
+                # Copy folder contents
                 rsync -a "$folder"/ "$target/$folder"/
 
-                # Delete original folder
+                # Remove original folder
                 rm -rf "$folder"
               fi
             fi
           done
 
-      - name: Commit Changes
+      - name: Commit and Push Changes
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
           git add .
 
-          git commit -m "Auto organize LeetCode problems" || echo "No changes"
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
 
-          git push
+          git commit -m "Auto organize LeetCode problems"
+
+          # Pull latest changes to avoid push conflicts
+          git pull --rebase origin main
+
+          git push origin main
