@@ -5,11 +5,16 @@ on:
     branches:
       - main
 
+concurrency:
+  group: organize-leetcode
+  cancel-in-progress: true
+  
 permissions:
   contents: write
 
 jobs:
   organize:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
     steps:
@@ -26,9 +31,10 @@ jobs:
 
             folder=$(basename "$dir")
 
-            # Skip unwanted folders
+            # Skip system/category folders
             if [[ "$folder" == "." || \
                   "$folder" == ".git" || \
+                  "$folder" == ".github" || \
                   "$folder" == "Easy" || \
                   "$folder" == "Medium" || \
                   "$folder" == "Hard" ]]; then
@@ -50,6 +56,12 @@ jobs:
               fi
 
               if [ -n "$target" ]; then
+              
+                # Skip if already exists
+                if [ -d "$target/$folder" ]; then
+                  echo "$target/$folder already exists"
+                  continue
+                fi
 
                 echo "Moving $folder -> $target"
 
@@ -66,16 +78,32 @@ jobs:
 
       - name: Commit and Push Changes
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add .
 
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
 
           git commit -m "Auto organize LeetCode problems"
 
-          # Pull latest changes to avoid push conflicts
-          git pull --rebase origin main
+          # Retry push up to 3 times
+          for i in 1 2 3; do
+            echo "Attempt $i"
 
-          git push origin main
+            git pull --rebase origin main || true
+
+            if git push origin HEAD:main; then
+              echo "Push successful"
+              exit 0
+            fi
+
+            echo "Push failed, retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "Push failed after 3 attempts"
+          exit 1
