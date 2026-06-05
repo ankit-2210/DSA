@@ -24,55 +24,69 @@ jobs:
           fetch-depth: 0
 
       - name: Organize Problems
+        shell: bash
         run: |
           mkdir -p Easy Medium Hard
 
-          find . -maxdepth 1 -type d | while read dir; do
+          find . -maxdepth 1 -mindepth 1 -type d | while read dir; do
 
             folder=$(basename "$dir")
 
-            # Skip system/category folders
-            if [[ "$folder" == "." || \
-                  "$folder" == ".git" || \
-                  "$folder" == ".github" || \
-                  "$folder" == "Easy" || \
-                  "$folder" == "Medium" || \
-                  "$folder" == "Hard" ]]; then
+            # Skip special folders
+            case "$folder" in
+              .git|.github|Easy|Medium|Hard)
+                continue
+                ;;
+            esac
+
+            # Only process folders starting with digits
+            if [[ ! "$folder" =~ ^[0-9]+ ]]; then
               continue
             fi
 
-            # Process only numbered LeetCode folders
-            if [[ "$folder" =~ ^[0-9]+ ]]; then
+            echo "Checking: $folder"
 
-              target=""
+            readme="$folder/README.md"
 
-              # Detect difficulty from README.md
-              if grep -qi "easy" "$folder/README.md" 2>/dev/null; then
-                target="Easy"
-              elif grep -qi "medium" "$folder/README.md" 2>/dev/null; then
-                target="Medium"
-              elif grep -qi "hard" "$folder/README.md" 2>/dev/null; then
-                target="Hard"
-              fi
-
-              if [ -n "$target" ]; then
-
-                echo "Moving $folder -> $target"
-
-                mkdir -p "$target"
-
-                # Skip if already organized
-                if [ -d "$target/$folder" ]; then
-                  echo "$target/$folder already exists"
-                  continue
-                fi
-
-                git mv "$folder" "$target/"
-              fi
+            if [ ! -f "$readme" ]; then
+              echo "README.md not found for $folder"
+              continue
             fi
+
+            difficulty=$(grep -ioE 'easy|medium|hard' "$readme" | head -n 1 | tr '[:upper:]' '[:lower:]')
+
+            target=""
+            case "$difficulty" in
+              easy)
+                target="Easy"
+                ;;
+              medium)
+                target="Medium"
+                ;;
+              hard)
+                target="Hard"
+                ;;
+            esac
+
+            if [ -z "$target" ]; then
+              echo "Could not determine difficulty for $folder"
+              continue
+            fi
+
+            echo "Moving $folder -> $target"
+
+            mkdir -p "$target"
+
+            if [ -d "$target/$folder" ]; then
+              echo "$target/$folder already exists"
+              continue
+            fi
+
+            git mv "$folder" "$target/"
           done
 
       - name: Commit and Push Changes
+        shell: bash
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -89,14 +103,14 @@ jobs:
           for i in 1 2 3; do
             echo "Push attempt $i"
 
-            git pull --rebase origin main
+            git pull --rebase origin main || true
 
             if git push origin HEAD:main; then
               echo "Push successful"
               exit 0
             fi
 
-            echo "Push failed. Retrying..."
+            echo "Push failed. Retrying in 5 seconds..."
             sleep 5
           done
 
