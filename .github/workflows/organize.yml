@@ -24,38 +24,28 @@ jobs:
           fetch-depth: 0
 
       - name: Organize Problems
-        shell: bash
         run: |
           set -e
 
           mkdir -p Easy Medium Hard
 
-          echo "Scanning repository..."
-
-          find . -type f -name "README.md" | while read -r readme; do
+          find . \
+            -path "./Easy" -prune -o \
+            -path "./Medium" -prune -o \
+            -path "./Hard" -prune -o \
+            -path "./.git" -prune -o \
+            -path "./.github" -prune -o \
+            -type f -name "README.md" -print | while read -r readme
+          do
 
             folder=$(dirname "$readme")
             folder="${folder#./}"
             folder_name=$(basename "$folder")
 
-            # ❌ SKIP already organized folders (THIS FIXES YOUR ISSUE)
-            if [[ "$folder" == "Easy" || "$folder" == "Medium" || "$folder" == "Hard" ]]; then
-              echo "Skipping root category folder: $folder"
-              continue
-            fi
-
-            if [[ "$folder" == Easy/* || "$folder" == Medium/* || "$folder" == Hard/* ]]; then
-              echo "Skipping already organized: $folder"
-              continue
-            fi
-
-            # only valid LeetCode problem folders
+            # Process only LeetCode problem folders
             if [[ ! "$folder_name" =~ ^[0-9] ]]; then
               continue
             fi
-
-            echo "-----------------------------------"
-            echo "Processing: $folder"
 
             difficulty=$(grep -iE 'easy|medium|hard' "$readme" \
               | head -n 1 \
@@ -63,30 +53,30 @@ jobs:
               | tr '[:upper:]' '[:lower:]')
 
             if [ -z "$difficulty" ]; then
-              echo "No difficulty found for $folder"
+              echo "Difficulty not found for $folder"
               continue
             fi
 
-            target=$(echo "$difficulty" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
+            case "$difficulty" in
+              easy) target="Easy" ;;
+              medium) target="Medium" ;;
+              hard) target="Hard" ;;
+              *) continue ;;
+            esac
 
             dest="$target/$folder_name"
 
-            echo "Moving → $dest"
-
-            mkdir -p "$target"
-
-            # prevent overwriting
             if [ -d "$dest" ]; then
               echo "Already exists: $dest"
               continue
             fi
 
+            echo "Moving $folder -> $dest"
             git mv "$folder" "$dest" 2>/dev/null || mv "$folder" "$dest"
 
           done
 
       - name: Commit Changes
-        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
