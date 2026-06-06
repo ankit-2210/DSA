@@ -5,12 +5,12 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 concurrency:
   group: organize-leetcode
   cancel-in-progress: true
-
-permissions:
-  contents: write
 
 jobs:
   organize:
@@ -26,70 +26,69 @@ jobs:
       - name: Organize Problems
         shell: bash
         run: |
+          set -e
+
           mkdir -p Easy Medium Hard
 
-          find . -maxdepth 1 -mindepth 1 -type d | while read dir; do
+          echo "Scanning repository..."
 
-            folder=$(basename "$dir")
+          # find all folders that contain README.md
+          find . -type f -name "README.md" | while read -r readme; do
 
-            # Skip special folders
+            folder=$(dirname "$readme")
+            folder="${folder#./}"
+            folder_name=$(basename "$folder")
+
+            # skip system folders
             case "$folder" in
-              .git|.github|Easy|Medium|Hard)
+              .github|Easy|Medium|Hard|*/Easy/*|*/Medium/*|*/Hard/*)
                 continue
                 ;;
             esac
 
-            # Only process folders starting with digits
-            if [[ ! "$folder" =~ ^[0-9]+ ]]; then
+            # only process valid problem folders (start with number or digit prefix)
+            if [[ ! "$folder_name" =~ ^[0-9] ]]; then
               continue
             fi
 
-            echo "Checking: $folder"
+            echo "--------------------------------------"
+            echo "Processing: $folder"
 
-            readme="$folder/README.md"
+            # extract difficulty
+            difficulty=$(grep -iE 'easy|medium|hard' "$readme" \
+              | head -n 1 \
+              | grep -ioE 'easy|medium|hard' \
+              | tr '[:upper:]' '[:lower:]')
 
-            if [ ! -f "$readme" ]; then
-              echo "README.md not found for $folder"
+            if [ -z "$difficulty" ]; then
+              echo "Skipping $folder (difficulty not found)"
               continue
             fi
 
-            difficulty=$(grep -ioE 'easy|medium|hard' "$readme" | head -n 1 | tr '[:upper:]' '[:lower:]')
+            target=$(echo "$difficulty" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
 
-            target=""
-            case "$difficulty" in
-              easy)
-                target="Easy"
-                ;;
-              medium)
-                target="Medium"
-                ;;
-              hard)
-                target="Hard"
-                ;;
-            esac
+            dest="$target/$folder_name"
 
-            if [ -z "$target" ]; then
-              echo "Could not determine difficulty for $folder"
-              continue
-            fi
-
-            echo "Moving $folder -> $target"
+            echo "Detected: $difficulty"
+            echo "Moving -> $dest"
 
             mkdir -p "$target"
 
-            if [ -d "$target/$folder" ]; then
-              echo "$target/$folder already exists"
+            if [ -d "$dest" ]; then
+              echo "Already exists: $dest"
               continue
             fi
 
-            git mv "$folder" "$target/"
+            # try git mv first, fallback to mv
+            git mv "$folder" "$target/" 2>/dev/null || mv "$folder" "$target/"
+
           done
 
       - name: Commit and Push Changes
         shell: bash
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add -A
 
@@ -100,19 +99,5 @@ jobs:
 
           git commit -m "Auto organize LeetCode problems"
 
-          for i in 1 2 3; do
-            echo "Push attempt $i"
-
-            git pull --rebase origin main || true
-
-            if git push origin HEAD:main; then
-              echo "Push successful"
-              exit 0
-            fi
-
-            echo "Push failed. Retrying in 5 seconds..."
-            sleep 5
-          done
-
-          echo "Push failed after 3 attempts"
-          exit 1
+          git pull --rebase origin main || true
+          git push origin main
