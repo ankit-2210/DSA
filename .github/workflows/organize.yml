@@ -58,7 +58,12 @@ jobs:
             target="$difficulty"
 
             if [ -d "$target/$folder" ]; then
-              echo "Already organized: $folder"
+              echo "Merging into existing folder: $target/$folder"
+
+              cp -rn "$folder/"* "$target/$folder/" 2>/dev/null || true
+
+              rm -rf "$folder"
+
               continue
             fi
 
