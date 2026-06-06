@@ -32,36 +32,38 @@ jobs:
 
           echo "Scanning repository..."
 
-          # find all folders that contain README.md
           find . -type f -name "README.md" | while read -r readme; do
 
             folder=$(dirname "$readme")
             folder="${folder#./}"
             folder_name=$(basename "$folder")
 
-            # skip system folders
-            case "$folder" in
-              .github|Easy|Medium|Hard|*/Easy/*|*/Medium/*|*/Hard/*)
-                continue
-                ;;
-            esac
+            # ❌ SKIP already organized folders (THIS FIXES YOUR ISSUE)
+            if [[ "$folder" == "Easy" || "$folder" == "Medium" || "$folder" == "Hard" ]]; then
+              echo "Skipping root category folder: $folder"
+              continue
+            fi
 
-            # only process valid problem folders (start with number or digit prefix)
+            if [[ "$folder" == Easy/* || "$folder" == Medium/* || "$folder" == Hard/* ]]; then
+              echo "Skipping already organized: $folder"
+              continue
+            fi
+
+            # only valid LeetCode problem folders
             if [[ ! "$folder_name" =~ ^[0-9] ]]; then
               continue
             fi
 
-            echo "--------------------------------------"
+            echo "-----------------------------------"
             echo "Processing: $folder"
 
-            # extract difficulty
             difficulty=$(grep -iE 'easy|medium|hard' "$readme" \
               | head -n 1 \
               | grep -ioE 'easy|medium|hard' \
               | tr '[:upper:]' '[:lower:]')
 
             if [ -z "$difficulty" ]; then
-              echo "Skipping $folder (difficulty not found)"
+              echo "No difficulty found for $folder"
               continue
             fi
 
@@ -69,22 +71,21 @@ jobs:
 
             dest="$target/$folder_name"
 
-            echo "Detected: $difficulty"
-            echo "Moving -> $dest"
+            echo "Moving → $dest"
 
             mkdir -p "$target"
 
+            # prevent overwriting
             if [ -d "$dest" ]; then
               echo "Already exists: $dest"
               continue
             fi
 
-            # try git mv first, fallback to mv
-            git mv "$folder" "$target/" 2>/dev/null || mv "$folder" "$target/"
+            git mv "$folder" "$dest" 2>/dev/null || mv "$folder" "$dest"
 
           done
 
-      - name: Commit and Push Changes
+      - name: Commit Changes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -98,6 +99,4 @@ jobs:
           fi
 
           git commit -m "Auto organize LeetCode problems"
-
-          git pull --rebase origin main || true
-          git push origin main
+          git push
