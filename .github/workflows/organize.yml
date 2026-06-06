@@ -8,10 +8,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: organize-leetcode
-  cancel-in-progress: true
-
 jobs:
   organize:
     if: github.actor != 'github-actions[bot]'
@@ -20,8 +16,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Organize Problems
         run: |
@@ -29,51 +23,47 @@ jobs:
 
           mkdir -p Easy Medium Hard
 
-          find . \
-            -path "./Easy" -prune -o \
-            -path "./Medium" -prune -o \
-            -path "./Hard" -prune -o \
-            -path "./.git" -prune -o \
-            -path "./.github" -prune -o \
-            -type f -name "README.md" -print | while read -r readme
+          find . -maxdepth 1 -type d | while read dir
           do
+            folder=$(basename "$dir")
 
-            folder=$(dirname "$readme")
-            folder="${folder#./}"
-            folder_name=$(basename "$folder")
-
-            # Process only LeetCode problem folders
-            if [[ ! "$folder_name" =~ ^[0-9] ]]; then
-              continue
-            fi
-
-            difficulty=$(grep -iE 'easy|medium|hard' "$readme" \
-              | head -n 1 \
-              | grep -ioE 'easy|medium|hard' \
-              | tr '[:upper:]' '[:lower:]')
-
-            if [ -z "$difficulty" ]; then
-              echo "Difficulty not found for $folder"
-              continue
-            fi
-
-            case "$difficulty" in
-              easy) target="Easy" ;;
-              medium) target="Medium" ;;
-              hard) target="Hard" ;;
-              *) continue ;;
+            # Skip non-problem folders
+            case "$folder" in
+              "."|".git"|".github"|"Easy"|"Medium"|"Hard")
+                continue
+                ;;
             esac
 
-            dest="$target/$folder_name"
-
-            if [ -d "$dest" ]; then
-              echo "Already exists: $dest"
+            # Process only LeetCode problem folders
+            if [[ ! "$folder" =~ ^[0-9]+- ]]; then
               continue
             fi
 
-            echo "Moving $folder -> $dest"
-            git mv "$folder" "$dest" 2>/dev/null || mv "$folder" "$dest"
+            readme="$dir/README.md"
 
+            if [ ! -f "$readme" ]; then
+              echo "README not found: $folder"
+              continue
+            fi
+
+            echo "Processing: $folder"
+
+            difficulty=$(grep -oE 'Difficulty-(Easy|Medium|Hard)' "$readme" | head -1 | cut -d'-' -f2)
+
+            if [ -z "$difficulty" ]; then
+              echo "Could not determine difficulty for $folder"
+              continue
+            fi
+
+            target="$difficulty"
+
+            if [ -d "$target/$folder" ]; then
+              echo "Already organized: $folder"
+              continue
+            fi
+
+            echo "Moving $folder -> $target/$folder"
+            git mv "$folder" "$target/$folder"
           done
 
       - name: Commit Changes
