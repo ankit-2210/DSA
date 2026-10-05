@@ -1,1 +1,0 @@
-<h2>score-of-parentheses Notes</h2><hr>[ Time taken: 1hr 28m 20s ]
